@@ -2,22 +2,20 @@ package engine
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"os"
-	"text/tabwriter"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
 
 	"github.com/argoproj/gitops-engine/pkg/cache"
 	"github.com/argoproj/gitops-engine/pkg/engine"
 	"github.com/argoproj/gitops-engine/pkg/sync"
+	"github.com/argoproj/gitops-engine/pkg/sync/common"
 	"github.com/argoproj/gitops-engine/pkg/utils/errors"
 	"github.com/argoproj/gitops-engine/pkg/utils/io"
 )
@@ -37,12 +35,11 @@ func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resyn
 	if err != nil {
 		return err
 	}
-
 	currentSHA, err := headHash(repo)
 	if err != nil {
 		return err
 	}
-	log.Printf("about to start synchronising: %s", currentSHA)
+	log.Printf("Starting synchronisation from commit: %s", currentSHA)
 
 	namespaces := []string{}
 	if peanutConfig.Namespaced {
@@ -61,46 +58,50 @@ func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resyn
 			resync <- true
 		}
 	}()
+	isManaged := isManagedChecker(peanutConfig.Git)
 	for {
 		select {
 		case <-resync:
 			log.Printf("Starting Synchronisation")
 			newSHA, err := fetchRepository(repo)
 			if err != nil {
-				return err
+				log.Errorf("failed to fetch updates to the respository: %s", err)
+				continue
 			}
 			if newSHA != currentSHA {
 				if newSHA != plumbing.ZeroHash {
-					log.Printf("current SHA %s, new SHA %s\n", currentSHA, newSHA)
+					log.Printf("New commit detected: previous SHA %s, new SHA %s\n", currentSHA, newSHA)
 					currentSHA = newSHA
 				}
 			}
 			workTree, err := treeForHash(repo, currentSHA)
 			if err != nil {
-				return err
+				log.Errorf("failed to calculate the tree for the hash: %s", err)
+				continue
 			}
 			targets, err := peanutConfig.Git.parseManifests(workTree)
 			if err != nil {
-				return err
+				log.Errorf("Failed to synchronize cluster state: %s", err)
 			}
-			result, err := gitOpsEngine.Sync(context.Background(), targets, func(r *cache.Resource) bool {
-				return r.Info.(*resourceInfo).gcMark == peanutConfig.Git.getGCMark(r.ResourceKey())
-			},
-				currentSHA.String(), peanutConfig.Namespace, sync.WithPrune(peanutConfig.Prune))
+			result, err := gitOpsEngine.Sync(
+				context.Background(), targets, isManaged,
+				currentSHA.String(), peanutConfig.Namespace,
+				sync.WithPrune(peanutConfig.Prune))
 			if err != nil {
 				log.Printf("Failed to synchronize cluster state: %v", err)
 				continue
 			}
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			_, _ = fmt.Fprintf(w, "RESOURCE\tRESULT\n")
-			for _, res := range result {
-				_, _ = fmt.Fprintf(w, "%s\t%s\n", res.ResourceKey.String(), res.Message)
-			}
-			_ = w.Flush()
+			log.Printf("Applied %#v\n", summariseResults(result))
 		case <-done:
-			log.Println("terminating synchronisation")
+			log.Println("Terminating synchronisation")
 			return nil
 		}
+	}
+}
+
+func isManagedChecker(gc GitConfig) func(r *cache.Resource) bool {
+	return func(r *cache.Resource) bool {
+		return r.Info.(*resourceInfo).gcMark == gc.getGCMark(r.ResourceKey())
 	}
 }
 
@@ -134,13 +135,15 @@ func cloneRepository(o GitConfig) (*git.Repository, error) {
 }
 
 func fetchRepository(r *git.Repository) (plumbing.Hash, error) {
-	err := r.Fetch(&git.FetchOptions{})
+	err := r.Fetch(&git.FetchOptions{RemoteName: "origin"})
 	if err != nil {
-		if err != git.NoErrAlreadyUpToDate {
+		if err == git.NoErrAlreadyUpToDate {
 			log.Println("No changes detected")
 			return plumbing.ZeroHash, nil
 		}
+		return plumbing.ZeroHash, err
 	}
+	log.Println("Changes detected")
 	return headHash(r)
 }
 
@@ -162,4 +165,28 @@ func treeForHash(r *git.Repository, h plumbing.Hash) (*object.Tree, error) {
 		return nil, err
 	}
 	return tree, nil
+}
+
+type summary struct {
+	Synced       int64
+	SyncFailed   int64
+	Pruned       int64
+	PruneSkipped int64
+}
+
+func summariseResults(results []common.ResourceSyncResult) summary {
+	s := summary{}
+	for _, r := range results {
+		switch r.Status {
+		case common.ResultCodeSynced:
+			s.Synced++
+		case common.ResultCodeSyncFailed:
+			s.SyncFailed++
+		case common.ResultCodePruned:
+			s.Pruned++
+		case common.ResultCodePruneSkipped:
+			s.PruneSkipped++
+		}
+	}
+	return s
 }

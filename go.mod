@@ -36,7 +36,8 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/viper v1.7.0
-	k8s.io/apimachinery v0.16.6
+	k8s.io/apimachinery v0.17.6
 	k8s.io/client-go v11.0.1-0.20190816222228-6d55c1b1f1ca+incompatible
+	knative.dev/pkg v0.0.0-20200616232624-ffb929374a39
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 )
