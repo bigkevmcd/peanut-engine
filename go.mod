@@ -32,9 +32,11 @@ require (
 	github.com/argoproj/pkg v0.0.0-20200424003221-9b858eff18a1
 	github.com/bigkevmcd/peanut v0.0.0-20200617060744-b104905993ee
 	github.com/go-git/go-git/v5 v5.1.0
+	github.com/google/go-cmp v0.4.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/viper v1.7.0
 	k8s.io/apimachinery v0.16.6
 	k8s.io/client-go v11.0.1-0.20190816222228-6d55c1b1f1ca+incompatible
+	sigs.k8s.io/kustomize v2.0.3+incompatible
 )
