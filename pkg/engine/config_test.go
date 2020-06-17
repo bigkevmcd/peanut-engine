@@ -4,9 +4,7 @@ import (
 	"testing"
 
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -67,24 +65,11 @@ func TestParseManifestAddsAnnotation(t *testing.T) {
 
 func clonedTree(t *testing.T) *object.Tree {
 	t.Helper()
-	clone, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
-		URL: "../../",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ref, err := clone.Head()
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit, err := clone.CommitObject(ref.Hash())
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree, err := commit.Tree()
-	if err != nil {
-		t.Fatal(err)
-	}
+	clone, err := cloneRepository(GitConfig{RepoURL: "../../"})
+	assertNoError(t, err)
+	head, err := headHash(clone)
+	assertNoError(t, err)
+	tree, err := treeForHash(clone, head)
 	assertNoError(t, err)
 	return tree
 }
