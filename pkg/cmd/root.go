@@ -2,15 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/argoproj/gitops-engine/pkg/utils/errors"
 	"github.com/argoproj/pkg/kube/cli"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/client-go/tools/clientcmd"
+	"knative.dev/pkg/signals"
 
 	"github.com/bigkevmcd/peanut-engine/pkg/engine"
 )
@@ -29,7 +30,7 @@ func init() {
 func makeRootCmd() *cobra.Command {
 	var (
 		clientConfig clientcmd.ClientConfig
-		cfg          engine.Config
+		cfg          engine.PeanutConfig
 		port         int
 	)
 	cmd := cobra.Command{
@@ -44,7 +45,7 @@ func makeRootCmd() *cobra.Command {
 			}
 
 			http.HandleFunc("/api/v1/sync", func(writer http.ResponseWriter, request *http.Request) {
-				log.Infof("Synchronization triggered by API call")
+				log.Println("Synchronization triggered by API call")
 				resync <- true
 			})
 
@@ -52,7 +53,7 @@ func makeRootCmd() *cobra.Command {
 				errors.CheckErrorWithCode(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", viper.GetInt(portFlag)), nil), errors.ErrorCommandSpecific)
 			}()
 
-			engine.PeanutSync(config, cfg, resync)
+			engine.StartPeanutSync(config, cfg, resync, signals.SetupSignalHandler())
 			return nil
 		},
 	}
