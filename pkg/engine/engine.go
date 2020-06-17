@@ -2,12 +2,15 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
+
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
@@ -33,11 +36,11 @@ type resourceInfo struct {
 func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resync chan bool, done <-chan struct{}) error {
 	repo, err := cloneRepository(peanutConfig.Git)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to clone repository: %w", err)
 	}
 	currentSHA, err := headHash(repo)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get the head hash: %w", err)
 	}
 	log.Printf("Starting synchronisation from commit: %s", currentSHA)
 
@@ -62,10 +65,10 @@ func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resyn
 	for {
 		select {
 		case <-resync:
-			log.Printf("Starting Synchronisation")
-			newSHA, err := fetchRepository(repo)
-			if err != nil {
-				log.Errorf("failed to fetch updates to the respository: %s", err)
+			log.Printf("Starting Synchronisation current SHA = %s\n", currentSHA)
+			newSHA, err := syncRepository(repo)
+			if err != nil && err != git.NoErrAlreadyUpToDate {
+				log.Errorf("Failed to fetch updates to the repository: %s", err)
 				continue
 			}
 			if newSHA != currentSHA {
@@ -74,6 +77,8 @@ func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resyn
 					currentSHA = newSHA
 				}
 			}
+			log.Printf("Getting tree for SHA = %s\n", currentSHA)
+			log.Printf("    post fetch SHA = %s\n", currentSHA)
 			workTree, err := treeForHash(repo, currentSHA)
 			if err != nil {
 				log.Errorf("failed to calculate the tree for the hash: %s", err)
@@ -124,26 +129,29 @@ func createClusterCache(namespaces []string, clientConfig *rest.Config) cache.Cl
 
 // TODO: return better errors here.
 func cloneRepository(o GitConfig) (*git.Repository, error) {
-	clone, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
-		URL:   o.RepoURL,
-		Depth: 1,
+	clone, err := git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
+		RemoteName: "origin",
+		URL:        o.RepoURL,
+		Depth:      1,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return clone, err
+	return clone, nil
 }
 
-func fetchRepository(r *git.Repository) (plumbing.Hash, error) {
-	err := r.Fetch(&git.FetchOptions{RemoteName: "origin"})
+func syncRepository(r *git.Repository) (plumbing.Hash, error) {
+	r.Fetch9
+	wtree, err := r.Worktree()
 	if err != nil {
-		if err == git.NoErrAlreadyUpToDate {
-			log.Println("No changes detected")
-			return plumbing.ZeroHash, nil
-		}
 		return plumbing.ZeroHash, err
 	}
-	log.Println("Changes detected")
+	err = wtree.Pull(&git.PullOptions{
+		RemoteName: "origin",
+	})
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
 	return headHash(r)
 }
 

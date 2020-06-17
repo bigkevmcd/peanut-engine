@@ -31,6 +31,7 @@ require (
 	github.com/argoproj/gitops-engine v0.1.3-0.20200615214904-fb2ec1384572
 	github.com/argoproj/pkg v0.0.0-20200424003221-9b858eff18a1
 	github.com/bigkevmcd/peanut v0.0.0-20200617060744-b104905993ee
+	github.com/go-git/go-billy/v5 v5.0.0
 	github.com/go-git/go-git/v5 v5.1.0
 	github.com/google/go-cmp v0.4.1
 	github.com/sirupsen/logrus v1.6.0
@@ -41,3 +42,5 @@ require (
 	knative.dev/pkg v0.0.0-20200616232624-ffb929374a39
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 )
+
+replace github.com/go-git/go-git/v5 => /Users/kevin/Source/Go/go-git

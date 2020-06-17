@@ -53,8 +53,7 @@ func makeRootCmd() *cobra.Command {
 				errors.CheckErrorWithCode(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", viper.GetInt(portFlag)), nil), errors.ErrorCommandSpecific)
 			}()
 
-			engine.StartPeanutSync(config, cfg, resync, signals.SetupSignalHandler())
-			return nil
+			return engine.StartPeanutSync(config, cfg, resync, signals.SetupSignalHandler())
 		},
 	}
 
