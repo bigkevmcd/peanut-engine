@@ -1,6 +1,7 @@
 resources:
 - deployment.yaml
 - service.yaml
+namespace: taxi-dev
 commonLabels:
   app.kubernetes.io/part-of: taxi
   app.kubernetes.io/name: taxi
