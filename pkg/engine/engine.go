@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/storage/memory"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -126,9 +128,10 @@ func createClusterCache(namespaces []string, clientConfig *rest.Config) cache.Cl
 }
 
 func cloneRepository(o GitConfig, clonePath string) (*git.Repository, error) {
-	clone, err := git.PlainClone(clonePath, false, &git.CloneOptions{
+	clone, err := git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
 		RemoteName:    remoteName,
 		URL:           o.RepoURL,
+		Depth:         2,
 		ReferenceName: plumbing.NewBranchReferenceName(o.Branch),
 	})
 
@@ -145,6 +148,7 @@ func upToDate(err error) bool {
 func syncRepository(o GitConfig, r *git.Repository) (plumbing.Hash, error) {
 	err := r.Fetch(&git.FetchOptions{
 		RemoteName: remoteName,
+		Depth:      2,
 		RefSpecs: []config.RefSpec{
 			config.RefSpec("+refs/heads/*:refs/remotes/origin/*"),
 		},
@@ -161,6 +165,7 @@ func syncRepository(o GitConfig, r *git.Repository) (plumbing.Hash, error) {
 	}
 	err = wtree.Pull(&git.PullOptions{
 		RemoteName:    remoteName,
+		Depth:         2,
 		ReferenceName: plumbing.NewBranchReferenceName(o.Branch),
 	})
 
