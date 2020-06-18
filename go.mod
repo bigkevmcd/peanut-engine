@@ -42,5 +42,3 @@ require (
 	knative.dev/pkg v0.0.0-20200616232624-ffb929374a39
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 )
-
-replace github.com/go-git/go-git/v5 => /Users/kevin/Source/Go/go-git

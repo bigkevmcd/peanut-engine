@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/argoproj/gitops-engine/pkg/utils/errors"
@@ -52,6 +54,14 @@ func makeRootCmd() *cobra.Command {
 			go func() {
 				errors.CheckErrorWithCode(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", viper.GetInt(portFlag)), nil), errors.ErrorCommandSpecific)
 			}()
+
+			dir, err := ioutil.TempDir("", "peanut")
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer os.RemoveAll(dir)
+			log.Printf("Cloning to %s\n", dir)
+			cfg.ClonePath = dir
 
 			return engine.StartPeanutSync(config, cfg, resync, signals.SetupSignalHandler())
 		},

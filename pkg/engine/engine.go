@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage/memory"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -25,6 +24,7 @@ import (
 
 const (
 	annotationGCMark = "gitops-agent.argoproj.io/gc-mark"
+	remoteName       = "origin"
 )
 
 type resourceInfo struct {
@@ -34,7 +34,7 @@ type resourceInfo struct {
 // StartPeanutSync starts watching the configured Git repository, and
 // synchronising the resources.
 func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resync chan bool, done <-chan struct{}) error {
-	repo, err := cloneRepository(peanutConfig.Git)
+	repo, err := cloneRepository(peanutConfig.Git, peanutConfig.ClonePath)
 	if err != nil {
 		return fmt.Errorf("failed to clone repository: %w", err)
 	}
@@ -65,8 +65,8 @@ func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resyn
 	for {
 		select {
 		case <-resync:
-			log.Printf("Starting Synchronisation current SHA = %s\n", currentSHA)
-			newSHA, err := syncRepository(repo)
+			log.Printf("Starting Synchronisation from %s", currentSHA)
+			newSHA, err := syncRepository(peanutConfig.Git, repo)
 			if err != nil && err != git.NoErrAlreadyUpToDate {
 				log.Errorf("Failed to fetch updates to the repository: %s", err)
 				continue
@@ -77,8 +77,6 @@ func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resyn
 					currentSHA = newSHA
 				}
 			}
-			log.Printf("Getting tree for SHA = %s\n", currentSHA)
-			log.Printf("    post fetch SHA = %s\n", currentSHA)
 			workTree, err := treeForHash(repo, currentSHA)
 			if err != nil {
 				log.Errorf("failed to calculate the tree for the hash: %s", err)
@@ -127,38 +125,59 @@ func createClusterCache(namespaces []string, clientConfig *rest.Config) cache.Cl
 	)
 }
 
-// TODO: return better errors here.
-func cloneRepository(o GitConfig) (*git.Repository, error) {
-	clone, err := git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
-		RemoteName: "origin",
-		URL:        o.RepoURL,
-		Depth:      1,
+func cloneRepository(o GitConfig, clonePath string) (*git.Repository, error) {
+	clone, err := git.PlainClone(clonePath, false, &git.CloneOptions{
+		RemoteName:    remoteName,
+		URL:           o.RepoURL,
+		ReferenceName: plumbing.NewBranchReferenceName(o.Branch),
 	})
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to clone %s to %s: %w", o.RepoURL, clonePath, err)
 	}
 	return clone, nil
 }
 
-func syncRepository(r *git.Repository) (plumbing.Hash, error) {
-	r.Fetch9
-	wtree, err := r.Worktree()
-	if err != nil {
-		return plumbing.ZeroHash, err
-	}
-	err = wtree.Pull(&git.PullOptions{
-		RemoteName: "origin",
+func upToDate(err error) bool {
+	return err == git.NoErrAlreadyUpToDate
+}
+
+func syncRepository(o GitConfig, r *git.Repository) (plumbing.Hash, error) {
+	err := r.Fetch(&git.FetchOptions{
+		RemoteName: remoteName,
+		RefSpecs: []config.RefSpec{
+			config.RefSpec("+refs/heads/*:refs/remotes/origin/*"),
+		},
 	})
 	if err != nil {
+		if !upToDate(err) {
+			return plumbing.ZeroHash, fmt.Errorf("failed to fetch from the Repository: %w", err)
+		}
 		return plumbing.ZeroHash, err
 	}
+	wtree, err := r.Worktree()
+	if err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("failed to get a Worktree from the Repository: %w", err)
+	}
+	err = wtree.Pull(&git.PullOptions{
+		RemoteName:    remoteName,
+		ReferenceName: plumbing.NewBranchReferenceName(o.Branch),
+	})
+
+	if err != nil {
+		if !upToDate(err) {
+			return plumbing.ZeroHash, fmt.Errorf("failed to pull the Worktree: %w", err)
+		}
+		return plumbing.ZeroHash, err
+	}
+
 	return headHash(r)
 }
 
 func headHash(r *git.Repository) (plumbing.Hash, error) {
 	ref, err := r.Head()
 	if err != nil {
-		return plumbing.ZeroHash, err
+		return plumbing.ZeroHash, fmt.Errorf("failed to get the Head for the Repository: %w", err)
 	}
 	return ref.Hash(), nil
 }
@@ -166,11 +185,11 @@ func headHash(r *git.Repository) (plumbing.Hash, error) {
 func treeForHash(r *git.Repository, h plumbing.Hash) (*object.Tree, error) {
 	commit, err := r.CommitObject(h)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get the CommitObject for %s: %w", h, err)
 	}
 	tree, err := commit.Tree()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get a Tree for the commit %s: %w", h, err)
 	}
 	return tree, nil
 }

@@ -9,10 +9,11 @@ import (
 
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
 	"github.com/bigkevmcd/peanut/pkg/gitfs"
-	"github.com/bigkevmcd/peanut/pkg/kustomize/parser"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/kustomize/pkg/resource"
+
+	"github.com/bigkevmcd/peanut/pkg/kustomize/parser"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 // GitConfig is the configuration for the repo to extract resources.
@@ -29,6 +30,7 @@ type PeanutConfig struct {
 	Namespace  string
 	Namespaced bool
 	Resync     time.Duration
+	ClonePath  string
 }
 
 func (g *GitConfig) getGCMark(key kube.ResourceKey) string {
