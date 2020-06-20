@@ -25,12 +25,10 @@ type GitConfig struct {
 
 // PeanutConfig configures the engine synchronisation.
 type PeanutConfig struct {
-	Git        GitConfig
 	Prune      bool
 	Namespace  string
 	Namespaced bool
 	Resync     time.Duration
-	ClonePath  string
 }
 
 func (g *GitConfig) getGCMark(key kube.ResourceKey) string {

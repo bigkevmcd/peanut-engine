@@ -11,19 +11,19 @@ import (
 )
 
 func TestParseManifest(t *testing.T) {
-	gt := clonedTree(t)
+	gt := sourceTree(t)
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/engine/testdata"}
 
 	m, err := c.parseManifests(gt)
 	assertNoError(t, err)
 
-	if l := len(m); l != 2 {
-		t.Fatalf("got %d resources, wanted 2", len(m))
+	if l := len(m); l != 3 {
+		t.Fatalf("got %d resources, wanted 3", len(m))
 	}
 }
 
 func TestParseManifestParsesResource(t *testing.T) {
-	gt := clonedTree(t)
+	gt := sourceTree(t)
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/engine/testdata"}
 
 	m, err := c.parseManifests(gt)
@@ -47,7 +47,7 @@ func TestParseManifestParsesResource(t *testing.T) {
 }
 
 func TestParseManifestAddsAnnotation(t *testing.T) {
-	gt := clonedTree(t)
+	gt := sourceTree(t)
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/engine/testdata"}
 
 	m, err := c.parseManifests(gt)
@@ -63,13 +63,14 @@ func TestParseManifestAddsAnnotation(t *testing.T) {
 	}
 }
 
-func clonedTree(t *testing.T) *object.Tree {
+func sourceTree(t *testing.T) *object.Tree {
 	t.Helper()
-	clone, err := cloneRepository(GitConfig{RepoURL: "../../"})
+	r := NewRepository(GitConfig{})
+	err := r.Open("../..")
 	assertNoError(t, err)
-	head, err := headHash(clone)
+	head, err := r.HeadHash()
 	assertNoError(t, err)
-	tree, err := treeForHash(clone, head)
+	tree, err := r.TreeForHash(head)
 	assertNoError(t, err)
 	return tree
 }

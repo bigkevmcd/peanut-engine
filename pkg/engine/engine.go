@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
@@ -33,12 +32,9 @@ type resourceInfo struct {
 
 // StartPeanutSync starts watching the configured Git repository, and
 // synchronising the resources.
-func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resync chan bool, done <-chan struct{}) error {
-	repo, err := cloneRepository(peanutConfig.Git, peanutConfig.ClonePath)
-	if err != nil {
-		return fmt.Errorf("failed to clone repository: %w", err)
-	}
-	currentSHA, err := headHash(repo)
+func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, peanutRepo *PeanutRepository, resync chan bool, done <-chan struct{}) error {
+
+	currentSHA, err := peanutRepo.HeadHash()
 	if err != nil {
 		return fmt.Errorf("failed to get the head hash: %w", err)
 	}
@@ -61,12 +57,12 @@ func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resyn
 			resync <- true
 		}
 	}()
-	isManaged := isManagedChecker(peanutConfig.Git)
+	isManaged := isManagedChecker(peanutRepo.config)
 	for {
 		select {
 		case <-resync:
 			log.Printf("Starting Synchronisation from %s", currentSHA)
-			newSHA, err := syncRepository(peanutConfig.Git, repo)
+			newSHA, err := peanutRepo.Sync()
 			if err != nil && err != git.NoErrAlreadyUpToDate {
 				log.Errorf("Failed to fetch updates to the repository: %s", err)
 				continue
@@ -77,12 +73,12 @@ func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, resyn
 					currentSHA = newSHA
 				}
 			}
-			workTree, err := treeForHash(repo, currentSHA)
+			workTree, err := treeForHash(peanutRepo.repo, currentSHA)
 			if err != nil {
 				log.Errorf("failed to calculate the tree for the hash: %s", err)
 				continue
 			}
-			targets, err := peanutConfig.Git.parseManifests(workTree)
+			targets, err := peanutRepo.config.parseManifests(workTree)
 			if err != nil {
 				log.Errorf("Failed to synchronize cluster state: %s", err)
 			}
@@ -140,46 +136,6 @@ func cloneRepository(o GitConfig, clonePath string) (*git.Repository, error) {
 
 func upToDate(err error) bool {
 	return err == git.NoErrAlreadyUpToDate
-}
-
-func syncRepository(o GitConfig, r *git.Repository) (plumbing.Hash, error) {
-	err := r.Fetch(&git.FetchOptions{
-		RemoteName: remoteName,
-		RefSpecs: []config.RefSpec{
-			config.RefSpec("+refs/heads/*:refs/remotes/origin/*"),
-		},
-	})
-	if err != nil {
-		if !upToDate(err) {
-			return plumbing.ZeroHash, fmt.Errorf("failed to fetch from the Repository: %w", err)
-		}
-		return plumbing.ZeroHash, err
-	}
-	wtree, err := r.Worktree()
-	if err != nil {
-		return plumbing.ZeroHash, fmt.Errorf("failed to get a Worktree from the Repository: %w", err)
-	}
-	err = wtree.Pull(&git.PullOptions{
-		RemoteName:    remoteName,
-		ReferenceName: plumbing.NewBranchReferenceName(o.Branch),
-	})
-
-	if err != nil {
-		if !upToDate(err) {
-			return plumbing.ZeroHash, fmt.Errorf("failed to pull the Worktree: %w", err)
-		}
-		return plumbing.ZeroHash, err
-	}
-
-	return headHash(r)
-}
-
-func headHash(r *git.Repository) (plumbing.Hash, error) {
-	ref, err := r.Head()
-	if err != nil {
-		return plumbing.ZeroHash, fmt.Errorf("failed to get the Head for the Repository: %w", err)
-	}
-	return ref.Hash(), nil
 }
 
 func treeForHash(r *git.Repository, h plumbing.Hash) (*object.Tree, error) {

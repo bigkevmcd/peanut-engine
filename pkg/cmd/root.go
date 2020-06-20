@@ -33,6 +33,7 @@ func makeRootCmd() *cobra.Command {
 	var (
 		clientConfig clientcmd.ClientConfig
 		cfg          engine.PeanutConfig
+		gitCfg       engine.GitConfig
 		port         int
 	)
 	cmd := cobra.Command{
@@ -55,27 +56,31 @@ func makeRootCmd() *cobra.Command {
 				errors.CheckErrorWithCode(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", viper.GetInt(portFlag)), nil), errors.ErrorCommandSpecific)
 			}()
 
+			peanutRepo := engine.NewRepository(gitCfg)
 			dir, err := ioutil.TempDir("", "peanut")
 			if err != nil {
 				log.Fatal(err)
 			}
 			defer os.RemoveAll(dir)
 			log.Printf("Cloning to %s\n", dir)
-			cfg.ClonePath = dir
+			err = peanutRepo.Clone(dir)
+			if err != nil {
+				return fmt.Errorf("failed to clone repository: %w", err)
+			}
 
-			return engine.StartPeanutSync(config, cfg, resync, signals.SetupSignalHandler())
+			return engine.StartPeanutSync(config, cfg, peanutRepo, resync, signals.SetupSignalHandler())
 		},
 	}
 
 	clientConfig = cli.AddKubectlFlagsToCmd(&cmd)
 
-	cmd.Flags().StringVar(&cfg.Git.RepoURL, repoURLFlag, "", "Repository to deploy")
+	cmd.Flags().StringVar(&gitCfg.RepoURL, repoURLFlag, "", "Repository to deploy")
 	logIfError(cmd.MarkFlagRequired(repoURLFlag))
 
-	cmd.Flags().StringVar(&cfg.Git.Branch, branchFlag, "", "Branch to checkout")
+	cmd.Flags().StringVar(&gitCfg.Branch, branchFlag, "", "Branch to checkout")
 	logIfError(cmd.MarkFlagRequired(branchFlag))
 
-	cmd.Flags().StringVar(&cfg.Git.Path, pathFlag, "", "Path within the Repository to deploy")
+	cmd.Flags().StringVar(&gitCfg.Path, pathFlag, "", "Path within the Repository to deploy")
 	logIfError(cmd.MarkFlagRequired(pathFlag))
 
 	cmd.Flags().DurationVar(&cfg.Resync, "resync", time.Second*300, "Resync duration")
