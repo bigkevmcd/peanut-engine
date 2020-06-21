@@ -21,11 +21,14 @@ import (
 )
 
 const (
-	repoURLFlag = "repo-url"
-	branchFlag  = "branch"
-	pathFlag    = "path"
-	portFlag    = "port"
-	resyncFlag  = "resync"
+	repoURLFlag          = "repo-url"
+	branchFlag           = "branch"
+	pathFlag             = "path"
+	portFlag             = "port"
+	resyncFlag           = "resync"
+	pruneFlag            = "prune"
+	namespacedFlag       = "namespaced"
+	defaultNamespaceFlag = "default-namespace"
 )
 
 func init() {
@@ -89,10 +92,10 @@ func makeRootCmd() *cobra.Command {
 
 	cmd.Flags().DurationVar(&cfg.Resync, resyncFlag, time.Minute*5, "Resync frequency")
 	cmd.Flags().IntVar(&port, portFlag, 8080, "Port number.")
-	cmd.Flags().BoolVar(&cfg.Prune, "prune", true, "Enables resource pruning.")
+	cmd.Flags().BoolVar(&cfg.Prune, pruneFlag, true, "Enables resource pruning.")
 	logIfError(viper.BindPFlag(portFlag, cmd.Flags().Lookup(portFlag)))
-	cmd.Flags().BoolVar(&cfg.Namespaced, "namespaced", false, "Switches agent into namespaced mode.")
-	cmd.Flags().StringVar(&cfg.Namespace, "default-namespace", "",
+	cmd.Flags().BoolVar(&cfg.Namespaced, namespacedFlag, false, "Switches agent into namespaced mode.")
+	cmd.Flags().StringVar(&cfg.Namespace, defaultNamespaceFlag, "",
 		"The namespace that should be used if resource namespace is not specified."+
 			"By default resources are installed into the same namespace where peanut-engine is installed.")
 	return &cmd

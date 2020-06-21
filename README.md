@@ -1,8 +1,10 @@
 # peanut-engine
 
-A simple service for deploying from a Git Repository using `argoproj/gitops-engine`.
+A simple component for deploying from a Git Repository using `argoproj/gitops-engine`.
 
 This includes automated git synchronisation, and parsing of Kustomize files.
+
+This is really just a thin wrapper around gitops-engine.
 
 ## Running
 
