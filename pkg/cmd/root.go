@@ -25,6 +25,7 @@ const (
 	branchFlag  = "branch"
 	pathFlag    = "path"
 	portFlag    = "port"
+	resyncFlag  = "resync"
 )
 
 func init() {
@@ -86,7 +87,7 @@ func makeRootCmd() *cobra.Command {
 	cmd.Flags().StringVar(&gitCfg.Path, pathFlag, "", "Path within the Repository to deploy")
 	logIfError(cmd.MarkFlagRequired(pathFlag))
 
-	cmd.Flags().DurationVar(&cfg.Resync, "resync", time.Second*300, "Resync duration")
+	cmd.Flags().DurationVar(&cfg.Resync, resyncFlag, time.Minute*5, "Resync frequency")
 	cmd.Flags().IntVar(&port, portFlag, 8080, "Port number.")
 	cmd.Flags().BoolVar(&cfg.Prune, "prune", true, "Enables resource pruning.")
 	logIfError(viper.BindPFlag(portFlag, cmd.Flags().Lookup(portFlag)))
