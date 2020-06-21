@@ -23,7 +23,6 @@ import (
 
 const (
 	annotationGCMark = "gitops-agent.argoproj.io/gc-mark"
-	remoteName       = "origin"
 )
 
 type resourceInfo struct {
@@ -33,7 +32,6 @@ type resourceInfo struct {
 // StartPeanutSync starts watching the configured Git repository, and
 // synchronising the resources.
 func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, peanutRepo *PeanutRepository, resync chan bool, done <-chan struct{}) error {
-
 	currentSHA, err := peanutRepo.HeadHash()
 	if err != nil {
 		return fmt.Errorf("failed to get the head hash: %w", err)
@@ -73,12 +71,7 @@ func StartPeanutSync(clientConfig *rest.Config, peanutConfig PeanutConfig, peanu
 					currentSHA = newSHA
 				}
 			}
-			workTree, err := treeForHash(peanutRepo.repo, currentSHA)
-			if err != nil {
-				log.Errorf("failed to calculate the tree for the hash: %s", err)
-				continue
-			}
-			targets, err := peanutRepo.config.parseManifests(workTree)
+			targets, err := peanutRepo.ParseManifests(currentSHA)
 			if err != nil {
 				log.Errorf("Failed to synchronize cluster state: %s", err)
 			}
@@ -119,19 +112,6 @@ func createClusterCache(namespaces []string, clientConfig *rest.Config) cache.Cl
 		cache.SetNamespaces(namespaces),
 		cache.SetPopulateResourceInfoHandler(infoHandler),
 	)
-}
-
-func cloneRepository(o GitConfig, clonePath string) (*git.Repository, error) {
-	clone, err := git.PlainClone(clonePath, false, &git.CloneOptions{
-		RemoteName:    remoteName,
-		URL:           o.RepoURL,
-		ReferenceName: plumbing.NewBranchReferenceName(o.Branch),
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to clone %s to %s: %w", o.RepoURL, clonePath, err)
-	}
-	return clone, nil
 }
 
 func upToDate(err error) bool {
