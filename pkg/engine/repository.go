@@ -1,16 +1,21 @@
 package engine
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
+	"github.com/argoproj/gitops-engine/pkg/cache"
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
-	"github.com/bigkevmcd/peanut/pkg/gitfs"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/kustomize/pkg/fs"
 	"sigs.k8s.io/kustomize/pkg/resource"
 
 	"github.com/bigkevmcd/peanut/pkg/kustomize/parser"
@@ -24,19 +29,12 @@ const (
 	defaultRemoteName = "origin"
 )
 
-type gitRepository interface {
-	Clone(string) error
-	Open(string) error
-	HeadHash() (plumbing.Hash, error)
-	TreeForHash(h plumbing.Hash) (*object.Tree, error)
-	Sync() (plumbing.Hash, error)
-}
-
 // PeanutRepository wraps git.Repository with some high-level functionality.
 type PeanutRepository struct {
 	config     GitConfig
 	repo       *git.Repository
 	remoteName string
+	repoPath   string
 }
 
 // NewRepository creates and returns a new PeanutRepository.
@@ -48,14 +46,15 @@ func NewRepository(cfg GitConfig) *PeanutRepository {
 }
 
 // Clone clones the configured repository to the provided path.
-func (p *PeanutRepository) Clone(clonePath string) error {
-	clone, err := git.PlainClone(clonePath, false, &git.CloneOptions{
+func (p *PeanutRepository) Clone(repoPath string) error {
+	p.repoPath = repoPath
+	clone, err := git.PlainClone(p.repoPath, false, &git.CloneOptions{
 		RemoteName:    p.remoteName,
 		URL:           p.config.RepoURL,
 		ReferenceName: plumbing.NewBranchReferenceName(p.config.Branch),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to clone %s to %s: %w", p.config.RepoURL, clonePath, err)
+		return fmt.Errorf("failed to clone %s to %s: %w", p.config.RepoURL, p.repoPath, err)
 	}
 	p.repo = clone
 	return nil
@@ -64,9 +63,10 @@ func (p *PeanutRepository) Clone(clonePath string) error {
 // Open assumes that the provided path contains a valid Git clone with the
 // correct branch.
 func (p *PeanutRepository) Open(openPath string) error {
-	repo, err := git.PlainOpen(openPath)
+	p.repoPath = openPath
+	repo, err := git.PlainOpen(p.repoPath)
 	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", openPath, err)
+		return fmt.Errorf("failed to open %s: %w", p.repoPath, err)
 	}
 	p.repo = repo
 	return nil
@@ -127,11 +127,7 @@ func (p *PeanutRepository) Sync() (plumbing.Hash, error) {
 // ParseManifests parses this repository's path, and returns the kustomized
 // resources.
 func (p *PeanutRepository) ParseManifests(h plumbing.Hash) ([]*unstructured.Unstructured, error) {
-	tree, err := p.TreeForHash(h)
-	if err != nil {
-		return nil, err
-	}
-	res, err := parser.ParseTreeToResMap(p.config.Path, gitfs.New(tree))
+	res, err := parser.ParseTreeToResMap(filepath.Join(p.repoPath, p.config.Path), fs.MakeRealFS())
 	if err != nil {
 		return nil, err
 	}
@@ -142,11 +138,22 @@ func (p *PeanutRepository) ParseManifests(h plumbing.Hash) ([]*unstructured.Unst
 			annotations = map[string]string{}
 		}
 		u := convert(v)
-		annotations[annotationGCMark] = p.config.getGCMark(kube.GetResourceKey(u))
+		annotations[annotationGCMark] = p.GCMark(kube.GetResourceKey(u))
 		v.SetAnnotations(annotations)
 		m = append(m, u)
 	}
 	return m, nil
+}
+
+func (p *PeanutRepository) IsManaged(r *cache.Resource) bool {
+	return r.Info.(*resourceInfo).gcMark == p.GCMark(r.ResourceKey())
+}
+
+func (p *PeanutRepository) GCMark(key kube.ResourceKey) string {
+	h := sha256.New()
+	_, _ = h.Write([]byte(fmt.Sprintf("%s/%s", p.config.RepoURL, p.config.Path)))
+	_, _ = h.Write([]byte(strings.Join([]string{key.Group, key.Kind, key.Name}, "/")))
+	return "sha256." + base64.RawURLEncoding.EncodeToString(h.Sum(nil))
 }
 
 func convert(r *resource.Resource) *unstructured.Unstructured {

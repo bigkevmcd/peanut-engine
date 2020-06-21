@@ -3,19 +3,21 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/argoproj/gitops-engine/pkg/utils/errors"
 	"github.com/argoproj/pkg/kube/cli"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/client-go/tools/clientcmd"
 	"knative.dev/pkg/signals"
 
 	"github.com/bigkevmcd/peanut-engine/pkg/engine"
+	"github.com/bigkevmcd/peanut-engine/pkg/metrics"
 )
 
 const (
@@ -47,6 +49,7 @@ func makeRootCmd() *cobra.Command {
 				errors.CheckErrorWithCode(err, errors.ErrorCommandSpecific)
 			}
 
+			http.Handle("/metrics", promhttp.Handler())
 			http.HandleFunc("/api/v1/sync", func(writer http.ResponseWriter, request *http.Request) {
 				log.Println("Synchronization triggered by API call")
 				resync <- true
@@ -62,13 +65,13 @@ func makeRootCmd() *cobra.Command {
 				log.Fatal(err)
 			}
 			defer os.RemoveAll(dir)
-			log.Printf("Cloning to %s\n", dir)
+			log.Printf("Cloning to %s", dir)
 			err = peanutRepo.Clone(dir)
 			if err != nil {
 				return fmt.Errorf("failed to clone repository: %w", err)
 			}
 
-			return engine.StartPeanutSync(config, cfg, peanutRepo, resync, signals.SetupSignalHandler())
+			return engine.StartPeanutSync(config, cfg, peanutRepo, metrics.New("peanut", nil), resync, signals.SetupSignalHandler())
 		},
 	}
 
@@ -84,7 +87,7 @@ func makeRootCmd() *cobra.Command {
 	logIfError(cmd.MarkFlagRequired(pathFlag))
 
 	cmd.Flags().DurationVar(&cfg.Resync, "resync", time.Second*300, "Resync duration")
-	cmd.Flags().IntVar(&port, portFlag, 9001, "Port number.")
+	cmd.Flags().IntVar(&port, portFlag, 8080, "Port number.")
 	cmd.Flags().BoolVar(&cfg.Prune, "prune", true, "Enables resource pruning.")
 	logIfError(viper.BindPFlag(portFlag, cmd.Flags().Lookup(portFlag)))
 	cmd.Flags().BoolVar(&cfg.Namespaced, "namespaced", false, "Switches agent into namespaced mode.")

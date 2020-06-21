@@ -47,7 +47,7 @@ func TestParseManifestAddsAnnotation(t *testing.T) {
 
 	d := m[0]
 	want := map[string]string{
-		annotationGCMark: c.getGCMark(kube.GetResourceKey(d)),
+		annotationGCMark: r.GCMark(kube.GetResourceKey(d)),
 	}
 
 	if diff := cmp.Diff(want, d.GetAnnotations()); diff != "" {
