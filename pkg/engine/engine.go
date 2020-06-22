@@ -62,6 +62,7 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 			log.Infof("Starting Synchronisation from %s", currentSHA)
 			newSHA, err := peanutRepo.Sync()
 			if err != nil && err != git.NoErrAlreadyUpToDate {
+				met.CountError()
 				log.Errorf("Failed to fetch updates to the repository: %s", err)
 				continue
 			}
@@ -73,6 +74,7 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 			}
 			targets, err := peanutRepo.ParseManifests()
 			if err != nil {
+				met.CountError()
 				log.Errorf("Failed to synchronize cluster state: %s", err)
 			}
 			result, err := gitOpsEngine.Sync(
@@ -80,6 +82,7 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 				currentSHA.String(), config.Namespace,
 				sync.WithPrune(config.Prune))
 			if err != nil {
+				met.CountError()
 				log.Infof("Failed to synchronize cluster state: %v", err)
 				continue
 			}
