@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -42,5 +43,14 @@ func TestKustomizationParseExtractsResources(t *testing.T) {
 	}
 	if n := d.GetNamespace(); n != "taxi-dev" {
 		t.Errorf("GetNamespace() got %s, want %s", n, "taxi-dev")
+	}
+}
+
+func TestKustomizationParseWithFailure(t *testing.T) {
+	k := &KustomizeParser{}
+
+	_, err := k.Parse("../..")
+	if !strings.Contains(err.Error(), `unable to find one of 'kustomization.yaml', 'kustomization.yml' or 'Kustomization' in directory`) {
+		t.Fatalf("incorrect error: %#v", err)
 	}
 }

@@ -43,6 +43,8 @@ func NewRepository(cfg GitConfig) *PeanutRepository {
 	}
 }
 
+// TODO: should Open and Clone be package level functions instead of methods?
+
 // Clone clones the configured repository to the provided path.
 func (p *PeanutRepository) Clone(repoPath string) error {
 	p.repoPath = repoPath
@@ -109,8 +111,9 @@ func (p *PeanutRepository) Sync() (plumbing.Hash, error) {
 	return p.HeadHash()
 }
 
-// ParseManifests parses this repository's path, and returns the kustomized
+// ParseManifests parses this repository's path, and returns the parsed
 // resources.
+// TODO: should this take a path? Is there
 func (p *PeanutRepository) ParseManifests() ([]*unstructured.Unstructured, error) {
 	res, err := p.parser.Parse(filepath.Join(p.repoPath, p.config.Path))
 	if err != nil {
@@ -121,25 +124,40 @@ func (p *PeanutRepository) ParseManifests() ([]*unstructured.Unstructured, error
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		annotations[annotationGCMark] = p.GCMark(kube.GetResourceKey(v))
+		gcm, err := p.GCMark(kube.GetResourceKey(v))
+		if err != nil {
+			return nil, err
+		}
+		annotations[annotationGCMark] = gcm
 		v.SetAnnotations(annotations)
 	}
 	return res, nil
 }
 
-// IsManaged is used by the cached to determine whether or not a resource is the
+// IsManaged is used by the cache to determine whether or not a resource is
 // a managed resource.
+// TODO: is this appropriate for the Repository?
 func (p *PeanutRepository) IsManaged(r *cache.Resource) bool {
-	return r.Info.(*resourceInfo).gcMark == p.GCMark(r.ResourceKey())
+	gcm, err := p.GCMark(r.ResourceKey())
+	if err != nil {
+		panic(err)
+	}
+	return r.Info.(*resourceInfo).gcMark == gcm
 }
 
 // GCMark calculates a signature for the resource from the repo URL and path
 // along with the GVK.
-func (p *PeanutRepository) GCMark(key kube.ResourceKey) string {
+func (p *PeanutRepository) GCMark(key kube.ResourceKey) (string, error) {
 	h := sha256.New()
-	_, _ = h.Write([]byte(fmt.Sprintf("%s/%s", p.config.RepoURL, p.config.Path)))
-	_, _ = h.Write([]byte(strings.Join([]string{key.Group, key.Kind, key.Name}, "/")))
-	return "sha256." + base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+	_, err := h.Write([]byte(fmt.Sprintf("%s/%s", p.config.RepoURL, p.config.Path)))
+	if err != nil {
+		return "", err
+	}
+	_, err = h.Write([]byte(strings.Join([]string{key.Group, key.Kind, key.Name}, "/")))
+	if err != nil {
+		return "", err
+	}
+	return "sha256." + base64.RawURLEncoding.EncodeToString(h.Sum(nil)), nil
 }
 
 // convert converts a Kustomize resource into a generic Unstructured resource
