@@ -47,11 +47,3 @@ func findByKind(r []*unstructured.Unstructured, k string) *unstructured.Unstruct
 	}
 	return nil
 }
-
-func parseManifests(t *testing.T) []*unstructured.Unstructured {
-	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/engine/testdata"}
-	r := testRepository(t, c)
-	m, err := r.ParseManifests()
-	assertNoError(t, err)
-	return m
-}
