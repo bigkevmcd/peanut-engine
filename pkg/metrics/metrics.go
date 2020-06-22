@@ -12,6 +12,7 @@ type PrometheusMetrics struct {
 	syncFailed   prometheus.Gauge
 	pruned       prometheus.Gauge
 	pruneSkipped prometheus.Gauge
+	errors       prometheus.Counter
 }
 
 // New creates and returns a PrometheusMetrics initialised with prometheus
@@ -46,13 +47,21 @@ func New(ns string, reg prometheus.Registerer) *PrometheusMetrics {
 		Help:      "Number of resources that the pruning skipped",
 	})
 
+	pm.errors = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: ns,
+		Name:      "errors",
+		Help:      "Count of errors during synchronisation",
+	})
+
 	reg.MustRegister(pm.synced)
 	reg.MustRegister(pm.syncFailed)
 	reg.MustRegister(pm.pruned)
 	reg.MustRegister(pm.pruneSkipped)
+	reg.MustRegister(pm.errors)
 	return pm
 }
 
+// Record is an implementation of the metrics Interface.
 func (p *PrometheusMetrics) Record(r []common.ResourceSyncResult) {
 	var synced, syncFailed, pruned, pruneSkipped float64
 	for _, r := range r {
@@ -71,4 +80,9 @@ func (p *PrometheusMetrics) Record(r []common.ResourceSyncResult) {
 	p.syncFailed.Set(syncFailed)
 	p.pruned.Set(pruned)
 	p.pruneSkipped.Set(pruneSkipped)
+}
+
+// CountError counts the number of errors during synchronisation.
+func (m *PrometheusMetrics) CountError() {
+	m.errors.Inc()
 }

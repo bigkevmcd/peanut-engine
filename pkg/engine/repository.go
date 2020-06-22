@@ -10,15 +10,11 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/argoproj/gitops-engine/pkg/cache"
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/kustomize/pkg/fs"
 	"sigs.k8s.io/kustomize/pkg/resource"
-
-	"github.com/bigkevmcd/peanut/pkg/kustomize/parser"
 )
 
 var defaultRefSpecs = []config.RefSpec{
@@ -35,6 +31,7 @@ type PeanutRepository struct {
 	repo       *git.Repository
 	remoteName string
 	repoPath   string
+	parser     ManifestParser
 }
 
 // NewRepository creates and returns a new PeanutRepository.
@@ -42,6 +39,7 @@ func NewRepository(cfg GitConfig) *PeanutRepository {
 	return &PeanutRepository{
 		config:     cfg,
 		remoteName: defaultRemoteName,
+		parser:     &KustomizeParser{},
 	}
 }
 
@@ -81,19 +79,6 @@ func (p *PeanutRepository) HeadHash() (plumbing.Hash, error) {
 	return ref.Hash(), nil
 }
 
-// TreeForHash returns a git tree that can be used to access files.
-func (p *PeanutRepository) TreeForHash(h plumbing.Hash) (*object.Tree, error) {
-	commit, err := p.repo.CommitObject(h)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get the CommitObject for %s: %w", h, err)
-	}
-	tree, err := commit.Tree()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get a Tree for the commit %s: %w", h, err)
-	}
-	return tree, nil
-}
-
 // Sync does a Fetch and Pull, and returns the HeadHash.
 func (p *PeanutRepository) Sync() (plumbing.Hash, error) {
 	err := p.repo.Fetch(&git.FetchOptions{
@@ -126,29 +111,30 @@ func (p *PeanutRepository) Sync() (plumbing.Hash, error) {
 
 // ParseManifests parses this repository's path, and returns the kustomized
 // resources.
-func (p *PeanutRepository) ParseManifests(h plumbing.Hash) ([]*unstructured.Unstructured, error) {
-	res, err := parser.ParseTreeToResMap(filepath.Join(p.repoPath, p.config.Path), fs.MakeRealFS())
+func (p *PeanutRepository) ParseManifests() ([]*unstructured.Unstructured, error) {
+	res, err := p.parser.Parse(filepath.Join(p.repoPath, p.config.Path))
 	if err != nil {
 		return nil, err
 	}
-	m := []*unstructured.Unstructured{}
 	for _, v := range res {
 		annotations := v.GetAnnotations()
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		u := convert(v)
-		annotations[annotationGCMark] = p.GCMark(kube.GetResourceKey(u))
+		annotations[annotationGCMark] = p.GCMark(kube.GetResourceKey(v))
 		v.SetAnnotations(annotations)
-		m = append(m, u)
 	}
-	return m, nil
+	return res, nil
 }
 
+// IsManaged is used by the cached to determine whether or not a resource is the
+// a managed resource.
 func (p *PeanutRepository) IsManaged(r *cache.Resource) bool {
 	return r.Info.(*resourceInfo).gcMark == p.GCMark(r.ResourceKey())
 }
 
+// GCMark calculates a signature for the resource from the repo URL and path
+// along with the GVK.
 func (p *PeanutRepository) GCMark(key kube.ResourceKey) string {
 	h := sha256.New()
 	_, _ = h.Write([]byte(fmt.Sprintf("%s/%s", p.config.RepoURL, p.config.Path)))
@@ -156,8 +142,14 @@ func (p *PeanutRepository) GCMark(key kube.ResourceKey) string {
 	return "sha256." + base64.RawURLEncoding.EncodeToString(h.Sum(nil))
 }
 
+// convert converts a Kustomize resource into a generic Unstructured resource
+// which the gitops engine Sync needs.
 func convert(r *resource.Resource) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: r.Map(),
 	}
+}
+
+func upToDate(err error) bool {
+	return err == git.NoErrAlreadyUpToDate
 }

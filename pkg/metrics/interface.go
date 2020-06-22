@@ -6,4 +6,6 @@ import "github.com/argoproj/gitops-engine/pkg/sync/common"
 type Interface interface {
 	// Record records all the metrics summarised from an engine Sync.
 	Record([]common.ResourceSyncResult)
+	// CountError tracks errors.
+	CountError()
 }

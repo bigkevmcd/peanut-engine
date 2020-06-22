@@ -2,7 +2,6 @@ package engine
 
 import (
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/argoproj/gitops-engine/pkg/cache"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -13,8 +12,12 @@ type GitRepository interface {
 	Clone(string) error
 	Open(string) error
 	HeadHash() (plumbing.Hash, error)
-	TreeForHash(h plumbing.Hash) (*object.Tree, error)
 	Sync() (plumbing.Hash, error)
-	ParseManifests(plumbing.Hash) ([]*unstructured.Unstructured, error)
+	ParseManifests() ([]*unstructured.Unstructured, error)
 	IsManaged(r *cache.Resource) bool
+}
+
+// ManifestParser parses a path with manifests into resources.
+type ManifestParser interface {
+	Parse(string) ([]*unstructured.Unstructured, error)
 }

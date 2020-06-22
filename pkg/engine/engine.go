@@ -35,12 +35,13 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 	if err != nil {
 		return fmt.Errorf("failed to get the head hash: %w", err)
 	}
-	log.Printf("Starting synchronisation from commit: %s", currentSHA)
+	log.Infof("Starting synchronisation from commit: %s", currentSHA)
 
 	namespaces := []string{}
 	if config.Namespaced {
 		namespaces = []string{config.Namespace}
 	}
+
 	clusterCache := createClusterCache(namespaces, clientConfig)
 	gitOpsEngine := engine.NewEngine(clientConfig, clusterCache)
 	closer, err := gitOpsEngine.Run()
@@ -54,10 +55,11 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 			resync <- true
 		}
 	}()
+
 	for {
 		select {
 		case <-resync:
-			log.Printf("Starting Synchronisation from %s", currentSHA)
+			log.Infof("Starting Synchronisation from %s", currentSHA)
 			newSHA, err := peanutRepo.Sync()
 			if err != nil && err != git.NoErrAlreadyUpToDate {
 				log.Errorf("Failed to fetch updates to the repository: %s", err)
@@ -65,11 +67,11 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 			}
 			if newSHA != currentSHA {
 				if newSHA != plumbing.ZeroHash {
-					log.Printf("New commit detected: previous SHA %s, new SHA %s\n", currentSHA, newSHA)
+					log.Infof("New commit detected: previous SHA %s, new SHA %s", currentSHA, newSHA)
 					currentSHA = newSHA
 				}
 			}
-			targets, err := peanutRepo.ParseManifests(currentSHA)
+			targets, err := peanutRepo.ParseManifests()
 			if err != nil {
 				log.Errorf("Failed to synchronize cluster state: %s", err)
 			}
@@ -78,7 +80,7 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 				currentSHA.String(), config.Namespace,
 				sync.WithPrune(config.Prune))
 			if err != nil {
-				log.Printf("Failed to synchronize cluster state: %v", err)
+				log.Infof("Failed to synchronize cluster state: %v", err)
 				continue
 			}
 			met.Record(result)
@@ -104,8 +106,4 @@ func createClusterCache(namespaces []string, clientConfig *rest.Config) cache.Cl
 		cache.SetNamespaces(namespaces),
 		cache.SetPopulateResourceInfoHandler(infoHandler),
 	)
-}
-
-func upToDate(err error) bool {
-	return err == git.NoErrAlreadyUpToDate
 }

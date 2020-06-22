@@ -67,6 +67,21 @@ testing_prune_skipped 1
 `)
 }
 
+func TestCountError(t *testing.T) {
+	m := New("testing", prometheus.NewRegistry())
+
+	m.CountError()
+
+	err := testutil.CollectAndCompare(m.errors, strings.NewReader(`
+# HELP testing_errors Count of errors during synchronisation
+# TYPE testing_errors counter
+testing_errors 1
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func assertMetricGauged(t *testing.T, m *PrometheusMetrics, r []common.ResourceSyncResult, g prometheus.Gauge, output string) {
 	m.Record(r)
 	err := testutil.CollectAndCompare(g, strings.NewReader(output))

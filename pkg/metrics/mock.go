@@ -1,6 +1,10 @@
 package metrics
 
-import "github.com/argoproj/gitops-engine/pkg/sync/common"
+import (
+	"sync"
+
+	"github.com/argoproj/gitops-engine/pkg/sync/common"
+)
 
 var _ Interface = (*MockMetrics)(nil)
 
@@ -11,6 +15,9 @@ type MockMetrics struct {
 	SyncFailed   int64
 	Pruned       int64
 	PruneSkipped int64
+	Errors       int64
+
+	mu sync.Mutex
 }
 
 // NewMock creates and returns a MockMetrics.
@@ -20,6 +27,8 @@ func NewMock() *MockMetrics {
 
 // CountFailedAPICall records failed outgoing API calls to upstream services.
 func (p *MockMetrics) Record(r []common.ResourceSyncResult) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	for _, r := range r {
 		switch r.Status {
 		case common.ResultCodeSynced:
@@ -32,4 +41,10 @@ func (p *MockMetrics) Record(r []common.ResourceSyncResult) {
 			p.PruneSkipped++
 		}
 	}
+}
+
+func (p *MockMetrics) CountError() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Errors++
 }

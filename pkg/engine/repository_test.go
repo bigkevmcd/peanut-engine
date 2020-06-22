@@ -6,43 +6,12 @@ import (
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-func TestParseManifest(t *testing.T) {
-	m := parseManifests(t)
-
-	if l := len(m); l != 3 {
-		t.Fatalf("got %d resources, wanted 3", len(m))
-	}
-}
-
-func TestParseManifestParsesResource(t *testing.T) {
-	m := parseManifests(t)
-
-	d := findByKind(m, "Deployment")
-	gvk := schema.GroupVersionKind{
-		Group:   "apps",
-		Version: "v1",
-		Kind:    "Deployment",
-	}
-	if diff := cmp.Diff(gvk, d.GroupVersionKind()); diff != "" {
-		t.Errorf("parsed manifest:\n%s", diff)
-	}
-	if n := d.GetName(); n != "taxi" {
-		t.Errorf("GetName() got %s, want %s", n, "taxi")
-	}
-	if n := d.GetNamespace(); n != "taxi-dev" {
-		t.Errorf("GetNamespace() got %s, want %s", n, "taxi-dev")
-	}
-}
 
 func TestParseManifestAddsAnnotation(t *testing.T) {
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/engine/testdata"}
 	r := testRepository(t, c)
-	h, err := r.HeadHash()
-	assertNoError(t, err)
-	m, err := r.ParseManifests(h)
+	m, err := r.ParseManifests()
 	assertNoError(t, err)
 
 	d := m[0]
@@ -82,9 +51,7 @@ func findByKind(r []*unstructured.Unstructured, k string) *unstructured.Unstruct
 func parseManifests(t *testing.T) []*unstructured.Unstructured {
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/engine/testdata"}
 	r := testRepository(t, c)
-	h, err := r.HeadHash()
-	assertNoError(t, err)
-	m, err := r.ParseManifests(h)
+	m, err := r.ParseManifests()
 	assertNoError(t, err)
 	return m
 }
