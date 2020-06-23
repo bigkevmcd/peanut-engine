@@ -137,3 +137,22 @@ func findByKind(r []*unstructured.Unstructured, k string) *unstructured.Unstruct
 	}
 	return nil
 }
+
+func mkTempDir(t *testing.T) (string, func()) {
+	t.Helper()
+	dir, err := ioutil.TempDir("", "peanut")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir, func() {
+		assertNoError(t, os.RemoveAll(dir))
+	}
+}
+
+func execGitHead(t *testing.T, dir string) string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	assertNoError(t, err)
+	return strings.TrimSpace(string(out))
+}
