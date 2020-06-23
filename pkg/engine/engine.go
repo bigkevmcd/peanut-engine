@@ -77,10 +77,12 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 				met.CountError()
 				log.Errorf("Failed to synchronize cluster state: %s", err)
 			}
+
 			result, err := gitOpsEngine.Sync(
 				context.Background(), targets, peanutRepo.IsManaged,
 				currentSHA.String(), config.Namespace,
 				sync.WithPrune(config.Prune))
+
 			if err != nil {
 				met.CountError()
 				log.Infof("Failed to synchronize cluster state: %v", err)
