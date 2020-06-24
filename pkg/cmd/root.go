@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"container/ring"
 	"github.com/argoproj/gitops-engine/pkg/utils/errors"
 	"github.com/argoproj/pkg/kube/cli"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/bigkevmcd/peanut-engine/pkg/engine"
 	"github.com/bigkevmcd/peanut-engine/pkg/metrics"
+	"github.com/bigkevmcd/peanut-engine/pkg/recent"
 )
 
 const (
@@ -52,7 +54,9 @@ func makeRootCmd() *cobra.Command {
 				cfg.Namespace, _, err = clientConfig.Namespace()
 				errors.CheckErrorWithCode(err, errors.ErrorCommandSpecific)
 			}
+			recentSyncs := recent.NewRecentSynchronisations(ring.New(5))
 
+			http.Handle("/", recent.NewRouter(recentSyncs))
 			http.Handle("/metrics", promhttp.Handler())
 			http.HandleFunc("/api/v1/sync", func(writer http.ResponseWriter, request *http.Request) {
 				log.Println("Synchronization triggered by API call")
@@ -75,7 +79,7 @@ func makeRootCmd() *cobra.Command {
 				return fmt.Errorf("failed to clone repository: %w", err)
 			}
 
-			return engine.StartPeanutSync(config, cfg, peanutRepo, metrics.New("peanut", nil), resync, signals.SetupSignalHandler())
+			return engine.StartPeanutSync(config, cfg, peanutRepo, metrics.New("peanut", nil), recentSyncs, resync, signals.SetupSignalHandler())
 		},
 	}
 

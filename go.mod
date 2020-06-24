@@ -10,6 +10,7 @@ require (
 	github.com/go-git/go-git/v5 v5.1.0
 	github.com/google/go-cmp v0.4.1
 	github.com/jenkins-x/go-scm v1.5.79
+	github.com/julienschmidt/httprouter v1.2.0
 	github.com/prometheus/client_golang v1.5.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
