@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/bigkevmcd/peanut-engine/pkg/metrics"
+	"github.com/bigkevmcd/peanut-engine/pkg/recent"
 )
 
 const (
@@ -30,7 +31,7 @@ type resourceInfo struct {
 
 // StartPeanutSync starts watching the configured Git repository, and
 // synchronising the resources.
-func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo GitRepository, met metrics.Interface, resync chan bool, done <-chan struct{}) error {
+func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo GitRepository, met metrics.Interface, syncs *recent.RecentSynchronisations, resync chan bool, done <-chan struct{}) error {
 	currentSHA, err := peanutRepo.HeadHash()
 	if err != nil {
 		return fmt.Errorf("failed to get the head hash: %w", err)
@@ -60,6 +61,7 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 		select {
 		case <-resync:
 			log.Infof("Starting Synchronisation from %s", currentSHA)
+			start := time.Now()
 			newSHA, err := peanutRepo.Sync()
 			if err != nil && err != git.NoErrAlreadyUpToDate {
 				met.CountError()
@@ -88,6 +90,7 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 				log.Infof("Failed to synchronize cluster state: %v", err)
 				continue
 			}
+			syncs.Add(start, time.Now(), currentSHA, result)
 			met.Record(result)
 		case <-done:
 			log.Println("Terminating synchronisation")
