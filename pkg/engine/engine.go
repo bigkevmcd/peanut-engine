@@ -84,13 +84,13 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 				context.Background(), targets, peanutRepo.IsManaged,
 				currentSHA.String(), config.Namespace,
 				sync.WithPrune(config.Prune))
+			syncs.Add(start, time.Now(), currentSHA, err, result)
 
 			if err != nil {
 				met.CountError()
 				log.Infof("Failed to synchronize cluster state: %v", err)
 				continue
 			}
-			syncs.Add(start, time.Now(), currentSHA, result)
 			met.Record(result)
 		case <-done:
 			log.Println("Terminating synchronisation")
