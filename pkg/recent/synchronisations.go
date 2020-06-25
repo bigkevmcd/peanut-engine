@@ -21,8 +21,8 @@ type RecentSynchronisations struct {
 }
 
 // Add records the details of a synchronisation in the ring.
-func (r *RecentSynchronisations) Add(start, end time.Time, sha plumbing.Hash, results []common.ResourceSyncResult) {
-	r.recent.Value = Synchronisation{Start: start, End: end, SHA: sha.String(), Results: results}
+func (r *RecentSynchronisations) Add(start, end time.Time, sha plumbing.Hash, syncErr error, results []common.ResourceSyncResult) {
+	r.recent.Value = Synchronisation{Start: start, End: end, SHA: sha.String(), Error: syncErr, Results: results}
 	r.recent = r.recent.Next()
 }
 
@@ -36,5 +36,6 @@ type Synchronisation struct {
 	Start   time.Time                   `json:"startTime"`
 	End     time.Time                   `json:"endTime"`
 	SHA     string                      `json:"sha"`
+	Error   error                       `json:"err"`
 	Results []common.ResourceSyncResult `json:"results"`
 }

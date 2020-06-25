@@ -3,6 +3,7 @@ package recent
 import (
 	"container/ring"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -21,11 +22,13 @@ func TestGetLatest(t *testing.T) {
 	ts, s := makeServer(t)
 	start, end := time.Date(2020, time.June, 24, 22, 0, 0, 0, time.UTC), time.Date(2020, time.June, 24, 22, 1, 0, 0, time.UTC)
 	sha := "7f193461f0b44fc5e397a63f2ddba8d9453e7a3f"
-	s.Add(start, end, plumbing.NewHash(sha), []common.ResourceSyncResult{
+	testErr := errors.New("this is an error")
+	s.Add(start, end, plumbing.NewHash(sha), testErr, []common.ResourceSyncResult{
 		{
 			Status:  common.ResultCodeSyncFailed,
 			Message: "service/taxi failed",
 			ResourceKey: kube.ResourceKey{
+				Group:     "v1",
 				Kind:      "ConfigMap",
 				Namespace: "test",
 				Name:      "test-cfg",
@@ -43,16 +46,15 @@ func TestGetLatest(t *testing.T) {
 		"startTime": "2020-06-24T22:00:00Z",
 		"endTime":   "2020-06-24T22:01:00Z",
 		"sha":       sha,
+		"error":     testErr.Error(),
 		"results": []interface{}{
 			map[string]interface{}{
-				"gvk": map[string]interface{}{
-					"Group":     "",
-					"Kind":      "ConfigMap",
-					"Name":      "test-cfg",
-					"Namespace": "test",
-				},
-				"message": "service/taxi failed",
-				"status":  "SyncFailed",
+				"group":     "v1",
+				"kind":      "ConfigMap",
+				"name":      "test-cfg",
+				"namespace": "test",
+				"message":   "service/taxi failed",
+				"status":    "SyncFailed",
 			},
 		},
 	})

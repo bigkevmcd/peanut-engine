@@ -8,7 +8,7 @@ require (
 	github.com/bigkevmcd/peanut v0.0.0-20200617060744-b104905993ee
 	github.com/go-git/go-billy/v5 v5.0.0
 	github.com/go-git/go-git/v5 v5.1.0
-	github.com/google/go-cmp v0.4.1
+	github.com/google/go-cmp v0.5.0
 	github.com/jenkins-x/go-scm v1.5.79
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/prometheus/client_golang v1.5.0
