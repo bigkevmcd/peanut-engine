@@ -59,6 +59,26 @@ func TestClone(t *testing.T) {
 	}
 }
 
+func TestCloneWithPrivateRepo(t *testing.T) {
+	if os.Getenv("TEST_GITHUB_AUTH_TOKEN") == "" {
+		t.Skip("this test needs a GitHub auth token")
+	}
+	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/go-demo-private.git", Branch: "main", Path: "pkg/engine/testdata", AuthToken: os.Getenv("TEST_GITHUB_AUTH_TOKEN")}
+	dir, cleanup := mkTempDir(t)
+	t.Cleanup(cleanup)
+	r := NewRepository(c)
+
+	err := r.Clone(dir)
+	assertNoError(t, err)
+
+	want := execGitHead(t, dir)
+	got, err := r.HeadHash()
+
+	if want != got.String() {
+		t.Fatalf("incorrect git SHA from HeadHash, got %#v, want %#v", got.String(), want)
+	}
+}
+
 func TestCloneWithMissingSource(t *testing.T) {
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/doesnotexist.git", Branch: "main", Path: "pkg/engine/testdata"}
 	dir, cleanup := mkTempDir(t)

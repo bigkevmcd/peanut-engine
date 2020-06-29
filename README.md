@@ -19,6 +19,9 @@ $ peanut-engine --repo-url https://github.com/org/repo.git --branch main --path 
 
 This will run something very similar to `kubectl apply -k deploy/environments/staging` from your repo/branch combination, every 5 minutes.
 
+To synchronise a private repository, set an `AUTH_TOKEN` environment variable
+with an auth token.
+
 ### Resync frequency
 
 By default, your resources are applied every 5 minutes, this can be configured

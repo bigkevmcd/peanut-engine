@@ -67,7 +67,9 @@ func makeRootCmd() *cobra.Command {
 				errors.CheckErrorWithCode(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", viper.GetInt(portFlag)), nil), errors.ErrorCommandSpecific)
 			}()
 
+			gitCfg.AuthToken = os.Getenv("AUTH_TOKEN")
 			peanutRepo := engine.NewRepository(gitCfg)
+
 			dir, err := ioutil.TempDir("", "peanut")
 			if err != nil {
 				log.Fatal(err)
@@ -82,7 +84,6 @@ func makeRootCmd() *cobra.Command {
 			return engine.StartPeanutSync(config, cfg, peanutRepo, metrics.New("peanut", nil), recentSyncs, resync, signals.SetupSignalHandler())
 		},
 	}
-
 	clientConfig = cli.AddKubectlFlagsToCmd(&cmd)
 
 	cmd.Flags().StringVar(&gitCfg.RepoURL, repoURLFlag, "", "Repository to deploy")
@@ -96,9 +97,12 @@ func makeRootCmd() *cobra.Command {
 
 	cmd.Flags().DurationVar(&cfg.Resync, resyncFlag, time.Minute*5, "Resync frequency")
 	cmd.Flags().IntVar(&port, portFlag, 8080, "Port number.")
+
 	cmd.Flags().BoolVar(&cfg.Prune, pruneFlag, true, "Enables resource pruning.")
 	logIfError(viper.BindPFlag(portFlag, cmd.Flags().Lookup(portFlag)))
+
 	cmd.Flags().BoolVar(&cfg.Namespaced, namespacedFlag, false, "Switches agent into namespaced mode.")
+
 	cmd.Flags().StringVar(&cfg.Namespace, defaultNamespaceFlag, "",
 		"The namespace that should be used if resource namespace is not specified."+
 			"By default resources are installed into the same namespace where peanut-engine is installed.")

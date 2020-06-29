@@ -48,11 +48,14 @@ func NewRepository(cfg GitConfig) *PeanutRepository {
 // Clone clones the configured repository to the provided path.
 func (p *PeanutRepository) Clone(repoPath string) error {
 	p.repoPath = repoPath
-	clone, err := git.PlainClone(p.repoPath, false, &git.CloneOptions{
+
+	opts := &git.CloneOptions{
+		Auth:          p.config.BasicAuth(),
 		RemoteName:    p.remoteName,
 		URL:           p.config.RepoURL,
 		ReferenceName: plumbing.NewBranchReferenceName(p.config.Branch),
-	})
+	}
+	clone, err := git.PlainClone(p.repoPath, false, opts)
 	if err != nil {
 		return fmt.Errorf("failed to clone %s to %s: %w", p.config.RepoURL, p.repoPath, err)
 	}
@@ -84,6 +87,7 @@ func (p *PeanutRepository) HeadHash() (plumbing.Hash, error) {
 // Sync does a Fetch and Pull, and returns the HeadHash.
 func (p *PeanutRepository) Sync() (plumbing.Hash, error) {
 	err := p.repo.Fetch(&git.FetchOptions{
+		Auth:       p.config.BasicAuth(),
 		RemoteName: p.remoteName,
 		RefSpecs:   defaultRefSpecs,
 	})
