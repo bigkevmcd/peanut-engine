@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taxi
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: taxi
+      app.kubernetes.io/part-of: taxi
+      app.kubernetes.io/version: "0.0.3"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: taxi
+        app.kubernetes.io/part-of: taxi
+        app.kubernetes.io/version: "0.0.3"
+    spec:
+      containers:
+      - name: taxi
+        image: bigkevmcd/image-hooks:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP

@@ -19,9 +19,6 @@ $ peanut-engine --repo-url https://github.com/org/repo.git --branch main --path 
 
 This will run something very similar to `kubectl apply -k deploy/environments/staging` from your repo/branch combination, every 5 minutes.
 
-To synchronise a private repository, set an `AUTH_TOKEN` environment variable
-with an auth token.
-
 ### Resync frequency
 
 By default, your resources are applied every 5 minutes, this can be configured
@@ -54,6 +51,25 @@ appropriately.
 Modify the command-line in th Deployment to use
 
 `--namespaced=true`
+
+## Command-line flags
+
+`peanut-engine` has a number of command-flags, but most of these are to allow
+configuration of the Kubernetes API client.
+
+The following flags control the behaviour of `peanut-engine` specifically.
+
+```
+ --repo-url string                Repository to deploy e.g. https://github.com/example/example.git
+ --branch string                  Branch to checkout e.g. production
+ --path string                    Path within the Repository to deploy e.g. deploy
+ --resync duration                Resync frequency (default 5m0s)
+ --auth-token string              Authentication token to use for private repositories
+ --parser string                  Which parser to use kustomize, or manifest, manifest will parse non-Kustomize configurations (default "kustomize")
+ --prune                          Enables resource pruning - i.e. resources not in the set will be removed
+ --default-namespace string       The namespace that should be used if resource namespace is not specified.By default resources are installed into the same namespace where peanut-engine is installed.
+ --namespaced                     Switches agent into namespaced mode
+```
 
 ## Testing
 

@@ -2,6 +2,7 @@ package recent
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -9,16 +10,21 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+// TODO: Currently there's only support for the most recent synchronisation.
+// Need to work out to safely provide access to the others.
+
 // RecentRouter is an HTTP API for accessing recent synchronisations.
 type RecentRouter struct {
 	*httprouter.Router
 	recent *RecentSynchronisations
 }
 
-// GePipelines fetches and returns the pipeline body.
+// GetLatest returns the most recent synchronisation log.
 func (a *RecentRouter) GetLatest(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(makeSynchronisationResponse(a.recent.Latest()))
-
+	err := json.NewEncoder(w).Encode(makeSynchronisationResponse(a.recent.Latest()))
+	if err != nil {
+		log.Printf("ERROR: failed to marshal recent entries: %s", err)
+	}
 }
 
 // NewRouter creates and returns a new RecentRouter.
