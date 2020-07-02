@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
+	"github.com/bigkevmcd/peanut-engine/pkg/parser/kustomize"
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestParseManifestAddsAnnotation(t *testing.T) {
-	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/engine/testdata"}
+	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/testdata"}
 	r := testRepository(t, c)
 	m, err := r.ParseManifests()
 	assertNoError(t, err)
@@ -31,8 +31,8 @@ func TestParseManifestAddsAnnotation(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
-	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/engine/testdata"}
-	r := NewRepository(c)
+	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/testdata"}
+	r := NewRepository(c, kustomize.New())
 	dir, cleanup := mkTempDir(t)
 	t.Cleanup(cleanup)
 	err := r.Open(dir)
@@ -43,10 +43,10 @@ func TestOpen(t *testing.T) {
 }
 
 func TestClone(t *testing.T) {
-	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut.git", Branch: "main", Path: "pkg/engine/testdata"}
+	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut.git", Branch: "main", Path: "pkg/testdata"}
 	dir, cleanup := mkTempDir(t)
 	t.Cleanup(cleanup)
-	r := NewRepository(c)
+	r := NewRepository(c, kustomize.New())
 
 	err := r.Clone(dir)
 	assertNoError(t, err)
@@ -80,10 +80,10 @@ func TestCloneWithPrivateRepo(t *testing.T) {
 }
 
 func TestCloneWithMissingSource(t *testing.T) {
-	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/doesnotexist.git", Branch: "main", Path: "pkg/engine/testdata"}
+	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/doesnotexist.git", Branch: "main", Path: "pkg/testdata"}
 	dir, cleanup := mkTempDir(t)
 	t.Cleanup(cleanup)
-	r := NewRepository(c)
+	r := NewRepository(c, kustomize.New())
 
 	err := r.Clone(dir)
 
@@ -100,7 +100,7 @@ func TestSync(t *testing.T) {
 
 func TestHeadHash(t *testing.T) {
 	want := execGitHead(t, ".")
-	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/engine/testdata"}
+	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/testdata"}
 	r := testRepository(t, c)
 	got, err := r.HeadHash()
 	assertNoError(t, err)
@@ -116,7 +116,7 @@ func TestIsManaged(t *testing.T) {
 
 func testRepository(t *testing.T, c GitConfig) *PeanutRepository {
 	t.Helper()
-	r := NewRepository(c)
+	r := NewRepository(c, kustomize.New())
 	err := r.Open("../..")
 	assertNoError(t, err)
 	return r
@@ -127,15 +127,6 @@ func assertNoError(t *testing.T, err error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-}
-
-func findByKind(r []*unstructured.Unstructured, k string) *unstructured.Unstructured {
-	for _, v := range r {
-		if v.GetKind() == k {
-			return v
-		}
-	}
-	return nil
 }
 
 func mkTempDir(t *testing.T) (string, func()) {

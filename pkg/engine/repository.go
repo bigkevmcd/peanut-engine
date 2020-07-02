@@ -13,8 +13,8 @@ import (
 
 	"github.com/argoproj/gitops-engine/pkg/cache"
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
+	"github.com/bigkevmcd/peanut-engine/pkg/parser"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/kustomize/pkg/resource"
 )
 
 var defaultRefSpecs = []config.RefSpec{
@@ -31,15 +31,15 @@ type PeanutRepository struct {
 	repo       *git.Repository
 	remoteName string
 	repoPath   string
-	parser     ManifestParser
+	parser     parser.ManifestParser
 }
 
 // NewRepository creates and returns a new PeanutRepository.
-func NewRepository(cfg GitConfig) *PeanutRepository {
+func NewRepository(cfg GitConfig, p parser.ManifestParser) *PeanutRepository {
 	return &PeanutRepository{
 		config:     cfg,
 		remoteName: defaultRemoteName,
-		parser:     &KustomizeParser{},
+		parser:     p,
 	}
 }
 
@@ -162,14 +162,6 @@ func (p *PeanutRepository) GCMark(key kube.ResourceKey) (string, error) {
 		return "", err
 	}
 	return "sha256." + base64.RawURLEncoding.EncodeToString(h.Sum(nil)), nil
-}
-
-// convert converts a Kustomize resource into a generic Unstructured resource
-// which the gitops engine Sync needs.
-func convert(r *resource.Resource) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: r.Map(),
-	}
 }
 
 func upToDate(err error) bool {

@@ -19,6 +19,9 @@ import (
 
 	"github.com/bigkevmcd/peanut-engine/pkg/engine"
 	"github.com/bigkevmcd/peanut-engine/pkg/metrics"
+	"github.com/bigkevmcd/peanut-engine/pkg/parser"
+	"github.com/bigkevmcd/peanut-engine/pkg/parser/kustomize"
+	"github.com/bigkevmcd/peanut-engine/pkg/parser/manifest"
 	"github.com/bigkevmcd/peanut-engine/pkg/recent"
 )
 
@@ -31,6 +34,7 @@ const (
 	pruneFlag            = "prune"
 	namespacedFlag       = "namespaced"
 	defaultNamespaceFlag = "default-namespace"
+	parserFlag           = "parser"
 )
 
 func init() {
@@ -43,6 +47,7 @@ func makeRootCmd() *cobra.Command {
 		cfg          engine.PeanutConfig
 		gitCfg       engine.GitConfig
 		port         int
+		parserName   string
 	)
 	cmd := cobra.Command{
 		Use: "peanut-engine",
@@ -70,6 +75,12 @@ func makeRootCmd() *cobra.Command {
 			gitCfg.AuthToken = os.Getenv("AUTH_TOKEN")
 			peanutRepo := engine.NewRepository(gitCfg)
 
+			var parser parser.ManifestParser = kustomize.New()
+			if parserName == "manifest" {
+				parser = manifest.New()
+			}
+
+			peanutRepo := engine.NewRepository(gitCfg, parser)
 			dir, err := ioutil.TempDir("", "peanut")
 			if err != nil {
 				log.Fatal(err)
@@ -81,7 +92,9 @@ func makeRootCmd() *cobra.Command {
 				return fmt.Errorf("failed to clone repository: %w", err)
 			}
 
-			return engine.StartPeanutSync(config, cfg, peanutRepo, metrics.New("peanut", nil), recentSyncs, resync, signals.SetupSignalHandler())
+			return engine.StartPeanutSync(
+				config, cfg, peanutRepo, metrics.New("peanut", nil),
+				recentSyncs, resync, signals.SetupSignalHandler())
 		},
 	}
 	clientConfig = cli.AddKubectlFlagsToCmd(&cmd)
@@ -94,6 +107,8 @@ func makeRootCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&gitCfg.Path, pathFlag, "", "Path within the Repository to deploy")
 	logIfError(cmd.MarkFlagRequired(pathFlag))
+
+	cmd.Flags().StringVar(&parserName, parserFlag, "kustomize", "Which parser to use kustomize, or manifest, manifest will parse raw files.")
 
 	cmd.Flags().DurationVar(&cfg.Resync, resyncFlag, time.Minute*5, "Resync frequency")
 	cmd.Flags().IntVar(&port, portFlag, 8080, "Port number.")

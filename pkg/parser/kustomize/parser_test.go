@@ -1,17 +1,21 @@
-package engine
+package kustomize
 
 import (
 	"strings"
 	"testing"
 
+	"github.com/bigkevmcd/peanut-engine/pkg/parser"
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+var _ parser.ManifestParser = (*KustomizeParser)(nil)
 
 func TestKustomizationParse(t *testing.T) {
 	k := &KustomizeParser{}
 
-	res, err := k.Parse("testdata")
+	res, err := k.Parse("../../testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +28,7 @@ func TestKustomizationParse(t *testing.T) {
 func TestKustomizationParseExtractsResources(t *testing.T) {
 	k := &KustomizeParser{}
 
-	res, err := k.Parse("testdata")
+	res, err := k.Parse("../../testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,4 +57,13 @@ func TestKustomizationParseWithFailure(t *testing.T) {
 	if !strings.Contains(err.Error(), `unable to find one of 'kustomization.yaml', 'kustomization.yml' or 'Kustomization' in directory`) {
 		t.Fatalf("incorrect error: %#v", err)
 	}
+}
+
+func findByKind(r []*unstructured.Unstructured, k string) *unstructured.Unstructured {
+	for _, v := range r {
+		if v.GetKind() == k {
+			return v
+		}
+	}
+	return nil
 }

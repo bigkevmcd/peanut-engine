@@ -16,8 +16,3 @@ type GitRepository interface {
 	ParseManifests() ([]*unstructured.Unstructured, error)
 	IsManaged(r *cache.Resource) bool
 }
-
-// ManifestParser parses a path with manifests into resources.
-type ManifestParser interface {
-	Parse(string) ([]*unstructured.Unstructured, error)
-}
