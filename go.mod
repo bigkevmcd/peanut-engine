@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	github.com/Sirupsen/logrus v0.0.0-00010101000000-000000000000 // indirect
-	github.com/argoproj/gitops-engine v0.1.3-0.20200702172612-56e31f366822
+	github.com/argoproj/gitops-engine v0.1.3
 	github.com/argoproj/pkg v0.0.0-20200424003221-9b858eff18a1
 	github.com/bigkevmcd/peanut v0.0.0-20200617060744-b104905993ee
 	github.com/go-git/go-git/v5 v5.1.0
