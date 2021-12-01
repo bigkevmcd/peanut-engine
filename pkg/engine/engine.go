@@ -11,8 +11,6 @@ import (
 	"github.com/argoproj/gitops-engine/pkg/cache"
 	"github.com/argoproj/gitops-engine/pkg/engine"
 	"github.com/argoproj/gitops-engine/pkg/sync"
-	"github.com/argoproj/gitops-engine/pkg/utils/errors"
-	"github.com/argoproj/gitops-engine/pkg/utils/io"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
@@ -45,9 +43,11 @@ func StartPeanutSync(clientConfig *rest.Config, config PeanutConfig, peanutRepo 
 
 	clusterCache := createClusterCache(namespaces, clientConfig)
 	gitOpsEngine := engine.NewEngine(clientConfig, clusterCache)
-	closer, err := gitOpsEngine.Run()
-	errors.CheckErrorWithCode(err, errors.ErrorCommandSpecific)
-	defer io.Close(closer)
+	cleanup, err := gitOpsEngine.Run()
+	if err != nil {
+		return fmt.Errorf("failed to start GitOps engine: %w", err)
+	}
+	defer cleanup()
 
 	go func() {
 		ticker := time.NewTicker(config.Resync)

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"container/ring"
-	"github.com/argoproj/gitops-engine/pkg/utils/errors"
+
 	"github.com/argoproj/pkg/kube/cli"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
@@ -55,10 +55,14 @@ func makeRootCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resync := make(chan bool)
 			config, err := clientConfig.ClientConfig()
-			errors.CheckErrorWithCode(err, errors.ErrorCommandSpecific)
+			if err != nil {
+				return err
+			}
 			if cfg.Namespace == "" {
 				cfg.Namespace, _, err = clientConfig.Namespace()
-				errors.CheckErrorWithCode(err, errors.ErrorCommandSpecific)
+				if err != nil {
+					return err
+				}
 			}
 			recentSyncs := recent.NewRecentSynchronisations(ring.New(1))
 
@@ -70,7 +74,7 @@ func makeRootCmd() *cobra.Command {
 			})
 
 			go func() {
-				errors.CheckErrorWithCode(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", viper.GetInt(portFlag)), nil), errors.ErrorCommandSpecific)
+				logIfError(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", viper.GetInt(portFlag)), nil))
 			}()
 
 			var parser parser.ManifestParser = kustomize.New()
@@ -81,7 +85,7 @@ func makeRootCmd() *cobra.Command {
 			peanutRepo := engine.NewRepository(gitCfg, parser)
 			dir, err := ioutil.TempDir("", "peanut")
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			defer os.RemoveAll(dir)
 			log.Printf("Cloning to %s", dir)
