@@ -5,7 +5,7 @@ import (
 
 	"github.com/bigkevmcd/peanut/pkg/kustomize/parser"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 // New creates and returns a new KustomizeParser.

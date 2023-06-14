@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -33,8 +32,7 @@ func TestParseManifestAddsAnnotation(t *testing.T) {
 func TestOpen(t *testing.T) {
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut-engine.git", Branch: "main", Path: "pkg/testdata"}
 	r := NewRepository(c, kustomize.New())
-	dir, cleanup := mkTempDir(t)
-	t.Cleanup(cleanup)
+	dir := mkTempDir(t)
 	err := r.Open(dir)
 
 	if !strings.Contains(err.Error(), `repository does not exist`) {
@@ -44,8 +42,7 @@ func TestOpen(t *testing.T) {
 
 func TestClone(t *testing.T) {
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/peanut.git", Branch: "main", Path: "pkg/testdata"}
-	dir, cleanup := mkTempDir(t)
-	t.Cleanup(cleanup)
+	dir := mkTempDir(t)
 	r := NewRepository(c, kustomize.New())
 
 	err := r.Clone(dir)
@@ -65,8 +62,7 @@ func TestCloneWithPrivateRepo(t *testing.T) {
 		t.Skip("this test needs a GitHub auth token")
 	}
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/go-demo-private.git", Branch: "main", Path: "pkg/engine/testdata", AuthToken: os.Getenv("TEST_GITHUB_AUTH_TOKEN")}
-	dir, cleanup := mkTempDir(t)
-	t.Cleanup(cleanup)
+	dir := mkTempDir(t)
 	r := NewRepository(c, kustomize.New())
 
 	err := r.Clone(dir)
@@ -83,8 +79,7 @@ func TestCloneWithPrivateRepo(t *testing.T) {
 
 func TestCloneWithMissingSource(t *testing.T) {
 	c := GitConfig{RepoURL: "https://github.com/bigkevmcd/doesnotexist.git", Branch: "main", Path: "pkg/testdata"}
-	dir, cleanup := mkTempDir(t)
-	t.Cleanup(cleanup)
+	dir := mkTempDir(t)
 	r := NewRepository(c, kustomize.New())
 
 	err := r.Clone(dir)
@@ -132,15 +127,17 @@ func assertNoError(t *testing.T, err error) {
 	}
 }
 
-func mkTempDir(t *testing.T) (string, func()) {
+func mkTempDir(t *testing.T) string {
 	t.Helper()
-	dir, err := ioutil.TempDir("", "peanut")
+	dir, err := os.MkdirTemp("", "peanut")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return dir, func() {
-		assertNoError(t, os.RemoveAll(dir))
-	}
+	t.Cleanup(func() {
+		os.RemoveAll(dir)
+	})
+
+	return dir
 }
 
 func execGitHead(t *testing.T, dir string) string {

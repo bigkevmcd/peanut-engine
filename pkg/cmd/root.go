@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -83,7 +82,7 @@ func makeRootCmd() *cobra.Command {
 			}
 
 			peanutRepo := engine.NewRepository(gitCfg, parser)
-			dir, err := ioutil.TempDir("", "peanut")
+			dir, err := os.MkdirTemp("", "peanut")
 			if err != nil {
 				return err
 			}

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -81,14 +81,14 @@ func assertJSONResponse(t *testing.T, res *http.Response, want map[string]interf
 	t.Helper()
 	if res.StatusCode != http.StatusOK {
 		defer res.Body.Close()
-		errMsg, err := ioutil.ReadAll(res.Body)
+		errMsg, err := io.ReadAll(res.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
 		t.Fatalf("didn't get a successful response: %v (%s)", res.StatusCode, strings.TrimSpace(string(errMsg)))
 	}
 	defer res.Body.Close()
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
